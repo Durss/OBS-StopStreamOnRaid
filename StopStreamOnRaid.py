@@ -170,4 +170,4 @@ def check_raid():
 				return
 
 def script_unload():
-	obs.timer_remove(check_connection)
+	return True
