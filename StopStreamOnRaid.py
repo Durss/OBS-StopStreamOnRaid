@@ -94,6 +94,8 @@ class TwitchIRC:
 		return response.rstrip()
 
 	def __read_socket(self):
+		# TODO: Find a way so this line becomes asynchronous and does not DESTROYS
+		# OBS framerate. Fuck it.
 		return self.__sock.recv(1024).decode("utf-8")
 
 	def __ping(self, msg):
