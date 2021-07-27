@@ -8,6 +8,7 @@
 # https://github.com/dmadison/OBS-ChatSpam
 #
 
+from threading import Timer
 import obspython as obs
 import socket
 import time
@@ -27,6 +28,7 @@ class TwitchIRC:
 		self.__sock = socket.socket()
 
 	def connect(self, suppress_warnings=True):
+		print("CONNECT")
 		connection_result = self.__connect()
 
 		if connection_result is not True:
@@ -104,7 +106,7 @@ class TwitchIRC:
 		self.__sock.send(("PONG" + host).encode("utf-8"))
 
 twitch = TwitchIRC()
-
+connectTimer = None
 # ------------------------------------------------------------
 
 # OBS Script Functions
@@ -120,14 +122,21 @@ def script_description():
 			"Generate an OAuth token from <a href='https://twitchapps.com/tmi/'>this page</a>."
 
 def script_update(settings):
+	global connectTimer
 	twitch.channel = obs.obs_data_get_string(settings, "channel").lower()
 
 	new_oauth = obs.obs_data_get_string(settings, "oauth").lower()
 	if new_oauth != twitch.password:
 		twitch.disconnect()  # Disconnect old oauth connection, if it exists
 		twitch.password = new_oauth
-
-	twitch.connect()
+	
+	# Attempt to reconnect 1 second after last update
+	if new_oauth and twitch.channel:
+		if connectTimer:
+			connectTimer.cancel()
+			connectTimer = None
+		connectTimer = Timer(1.0, twitch.connect)
+		connectTimer.start()
 
 
 def script_properties():
@@ -150,6 +159,7 @@ def check_raid():
 			res = twitch.read()
 		except socket.timeout:
 			return
+		print(res)
 		if res:
 			if(res.find("HOSTTARGET") != -1):
 				print("Raid detected!")
