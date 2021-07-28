@@ -25,11 +25,11 @@ class TwitchIRC:
 		self.__last_message = 0.0  # Last connection timestamp
 		self.timeout = 10.0  # Time before open connection is closed, in seconds
 
-		self.__sock = socket.socket()
-		self.__sock.setblocking(False)
+		self.__sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		self.__sock.setblocking(0)
 
 	def connect(self, suppress_warnings=True):
-		print("CONNECT")
+		print("Connecting...")
 		connection_result = self.__connect()
 
 		if connection_result is not True:
@@ -42,6 +42,20 @@ class TwitchIRC:
 
 		self.connected = True
 		return True
+
+	def sendData(self, data):
+		total_sent = 0
+		data_size = len(data)
+		while len(data):
+			try:
+				sent = self.__sock.send(data)
+				total_sent += sent
+				data = data[sent:]
+			except e:
+				if e.errno != errno.EAGAIN:
+					raise e
+				print('Blocking with', len(data), 'remaining')
+				select.select([], [self.__sock], [])  # This blocks until
 
 	def __connect(self):
 		if self.connected:
@@ -58,23 +72,21 @@ class TwitchIRC:
 			return "No response from server (connection timed out)"
 
 		if self.password != "":
-			self.__sock.send("PASS {}\r\n".format(self.password).encode("utf-8"))
-		self.__sock.send("NICK {}\r\n".format(self.channel).encode("utf-8"))
-		self.__sock.send("JOIN #{}\r\n".format(self.channel).encode("utf-8"))
+			self.sendData("PASS {}\r\n".format(self.password).encode("utf-8"))
+		self.sendData("NICK {}\r\n".format(self.channel).encode("utf-8"))
+		self.sendData("JOIN #{}\r\n".format(self.channel).encode("utf-8"))
 
-		self.__sock.settimeout(1)
 		auth_response = self.read()
 		if "Welcome, GLHF!" not in auth_response:
 			return "Bad Authentication! Check your Oauth key"
 		
-		self.__sock.settimeout(1)
-		self.__sock.send("CAP REQ :twitch.tv/commands\r\n".encode("utf-8"))
-		self.__sock.settimeout(1)
+		self.sendData("CAP REQ :twitch.tv/commands\r\n".encode("utf-8"))
 		try:
 			self.read()  # Wait for "JOIN" response
 		except socket.timeout:
 			return "Channel not found!"
 
+		print("Connected to IRC", self.channel)
 		return True
 
 	def disconnect(self):
@@ -88,6 +100,14 @@ class TwitchIRC:
 			self.disconnect()
 		print("Authentication successful!")
 
+	def readAsync(self):
+		try:
+			self.__sock.setblocking(False)
+			response = self.__sock.recv(1024).decode("utf-8")
+			return response.rstrip()
+		except BlockingIOError:
+			pass
+
 	def read(self):
 		response = self.__read_socket()
 		while self.__ping(response):
@@ -95,8 +115,6 @@ class TwitchIRC:
 		return response.rstrip()
 
 	def __read_socket(self):
-		# TODO: Find a way so this line becomes asynchronous and does not DESTROYS
-		# OBS framerate. Fuck it.
 		return self.__sock.recv(1024).decode("utf-8")
 
 	def __ping(self, msg):
@@ -106,7 +124,7 @@ class TwitchIRC:
 		return False
 
 	def __pong(self, host):
-		self.__sock.send(("PONG" + host).encode("utf-8"))
+		sendData(("PONG" + host).encode("utf-8"))
 
 twitch = TwitchIRC()
 connectTimer = None
@@ -159,15 +177,12 @@ def check_raid():
 	if twitch.connected:
 		res = ""
 		try:
-			res = twitch.read()
+			res = twitch.readAsync()
 		except socket.timeout:
 			return
-		print(res)
 		if res:
-			if(res.find("HOSTTARGET") != -1):
+			if res.find("HOSTTARGET") != -1:
 				print("Raid detected!")
-				# TODO close OBS
-				# obs.timer_add(close_obs, 1000)
 				obs.obs_frontend_streaming_stop()
 				return
 
