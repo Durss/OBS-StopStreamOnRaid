@@ -26,6 +26,7 @@ class TwitchIRC:
 		self.timeout = 10.0  # Time before open connection is closed, in seconds
 
 		self.__sock = socket.socket()
+		self.__sock.setblocking(False)
 
 	def connect(self, suppress_warnings=True):
 		print("CONNECT")
@@ -56,7 +57,7 @@ class TwitchIRC:
 		except (TimeoutError, socket.timeout):
 			return "No response from server (connection timed out)"
 
-		if self.password is not "":
+		if self.password != "":
 			self.__sock.send("PASS {}\r\n".format(self.password).encode("utf-8"))
 		self.__sock.send("NICK {}\r\n".format(self.channel).encode("utf-8"))
 		self.__sock.send("JOIN #{}\r\n".format(self.channel).encode("utf-8"))
@@ -167,6 +168,7 @@ def check_raid():
 				print("Raid detected!")
 				# TODO close OBS
 				# obs.timer_add(close_obs, 1000)
+				obs.obs_frontend_streaming_stop()
 				return
 
 def script_unload():
