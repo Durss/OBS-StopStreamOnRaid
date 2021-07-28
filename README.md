@@ -1,7 +1,5 @@
 # OBS-StopStreamOnRaid
-Attempt at creating a script that automatically stops twitch streaming after raiding.
-
-⚠⚠⚠ `SCRIPT NOT WORKING YET` ⚠⚠⚠
+Simple script detecting when a twitch raid is done to automatically close the stream on OBS.
 
 Import the script on OBS via Tools->scripts:\
 ![image](https://user-images.githubusercontent.com/721001/127200029-898446b5-8107-4552-a0f7-2d4e52363072.png)
